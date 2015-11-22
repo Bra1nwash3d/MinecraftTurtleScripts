@@ -44,18 +44,14 @@ function updateWindow(item, MEData)
 	window.write(MEData.size)
 
 	window.setCursorPos(textPositions.updateDif, 1)
-	window.write("(")
 	window.setTextColor(changeColour)
 	window.write(prefix..(newAmount-oldAmount))
 	window.setTextColor(colors.white)
-	window.write(")")
 
 	window.setCursorPos(textPositions.perSec, 1)
-	window.write("(")
 	window.setTextColor(changeColour)
 	window.write(prefix..((newAmount-oldAmount)/updateEachSeconds))
 	window.setTextColor(colors.white)
-	window.write(")")
 end
 
 function setupItemWindows(monitor, columns, rows, posX, posY, sizeToUseX, sizeToUseY)
