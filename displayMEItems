@@ -1,0 +1,174 @@
+args = {...}
+local itemsOfInterest = {}
+local counterWindow = nil
+local totalValueIndent = 3
+local updateDifIndent = 8
+local updateEachSeconds = 60
+
+local textPositions = {
+	["name"] = 1,
+	["total"] = 15,
+	["updateDif"] = 25,
+	["perSec"] = 35,
+}
+
+function putItemOfInterest(displayName, id, dmg)
+	table.insert(itemsOfInterest, {
+		["name"] = displayName,
+		["id"] = id,
+		["dmg"] = dmg,
+		["lastValue"] = 0,
+		["window"] = nil,
+	})
+end
+
+function updateWindow(item, MEData)
+	local window = item.window
+	local oldAmount = item.lastValue
+	local newAmount = MEData.size
+	local changed = newAmount - oldAmount
+	local prefix = "+"
+	local changeColour = colors.green
+	if changed < 0 then
+		prefix = ""
+		changeColour = colors.red
+	end
+
+	item.lastValue = newAmount
+
+	window.clear()
+	window.setCursorPos(textPositions.name, 1)
+	window.write(item.name)
+
+	window.setCursorPos(textPositions.total, 1)
+	window.write(MEData.size)
+
+	window.setCursorPos(textPositions.updateDif, 1)
+	window.write("(")
+	window.setTextColor(changeColour)
+	window.write(prefix..(newAmount-oldAmount))
+	window.setTextColor(colors.white)
+	window.write(")")
+
+	window.setCursorPos(textPositions.perSec, 1)
+	window.write("(")
+	window.setTextColor(changeColour)
+	window.write(prefix..((newAmount-oldAmount)/updateEachSeconds))
+	window.setTextColor(colors.white)
+	window.write(")")
+end
+
+function setupItemWindows(monitor, columns, rows, posX, posY, sizeToUseX, sizeToUseY)
+	local individualSizeX = sizeToUseX/columns
+	local individualSizeY = sizeToUseY/rows
+
+	local curIndex = 1
+	for c=1, columns do
+		for r=1, rows do
+			itemsOfInterest[curIndex].window = window.create(monitor, posX+(c-1)*individualSizeX, posY+(r-1)*individualSizeY, individualSizeX, individualSizeY)
+			curIndex = curIndex + 1
+		end
+	end
+end
+
+function setupMonitor(monitor)
+	local curY = 6
+	local monitorSizeX, monitorSizeY = monitor.getSize()
+	local columns = 1
+	local rows = #itemsOfInterest/columns
+
+	monitor.clear()
+	for i=1, columns do
+		local headline = window.create(monitor, 1+(i-1)*(monitorSizeX/columns), curY, monitorSizeX/columns, 1)
+		headline.clear()
+		headline.setCursorPos(textPositions.name, 1)
+		headline.write("Type")
+		headline.setCursorPos(textPositions.total, 1)
+		headline.write("Total")
+		headline.setCursorPos(textPositions.updateDif, 1)
+		headline.write("Per "..updateEachSeconds.."s")
+		headline.setCursorPos(textPositions.perSec, 1)
+		headline.write("Per second")
+	end
+	curY = curY + 2
+
+	setupItemWindows(monitor, columns, rows, 1, curY, monitorSizeX-1, #itemsOfInterest/columns)
+	counterWindow = window.create(monitor, 1, monitorSizeY, monitorSizeX, 1)
+end
+
+local ae = peripheral.find("aemultipart") or peripheral.find("tilecontroller") or peripheral.wrap("back") or peripheral.find("tileinterface")
+if not ae then
+	print("AE not found")
+	return
+end
+
+local monitor = peripheral.find("monitor")
+if not monitor then
+	print("monitor not found")
+	return
+end
+
+--init interesting items
+putItemOfInterest("Diamond", "minecraft:diamond", 0)
+putItemOfInterest("Emerald", "minecraft:emerald", 0)
+putItemOfInterest("Gold Ingot", "minecraft:gold_ingot", 0)
+putItemOfInterest("Iron Ingot", "minecraft:iron_ingot", 0)
+putItemOfInterest("Ender Pearl", "minecraft:ender_pearl", 0)
+putItemOfInterest("Blaze Rod", "minecraft:blaze_rod", 0)
+putItemOfInterest("Yellorium", "BigReactors:BRIngot", 0)
+setupMonitor(monitor)
+
+
+while true do
+	local var = ae.getAvailableItems()
+	for i=1, #var do
+		for _, interestingItem in ipairs(itemsOfInterest) do
+			if var[i].fingerprint.id == interestingItem.id then
+				if var[i].fingerprint.dmg == interestingItem.dmg then
+					updateWindow(interestingItem, var[i])
+					break
+				end
+			end
+		end
+	end
+	for i=updateEachSeconds-1, 0, -1 do
+		os.sleep(1)
+		counterWindow.clear()
+		counterWindow.setCursorPos(1, 1)
+		counterWindow.write("Next update in "..i.." seconds")
+	end
+end
+
+
+--[[
+
+AE uses:
+item objects {
+	size:number
+	is_item:boolean
+	is_fluid:boolean
+	is_craftable:boolean
+	fingerprint:table {
+		id: minecraft:dirt
+		dmg:number
+		nbt_hash:hash
+	}
+}
+
+vanilla chst use:
+item stacks {
+	display_name = "Birch Wood",
+	qty = 1, --quantity
+	max_size = 64,
+	max_dmg = 0,
+	raw_name = "tile.log.birch",
+	burn_time = 300,
+	dmg = 2,
+	ore_dict = {
+		logWood = true,
+	},
+	name = "log",
+	mod_id = "minecraft"
+}
+
+]]
